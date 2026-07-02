@@ -38,7 +38,7 @@ function shuffle(arr) {
 function getRoleDistribution(playerCount) {
   const dist = { werewolf: 0, villager: 0, seer: 0, doctor: 0 };
   if (playerCount <= 5) {
-    dist.werewolf = 1; dist.villager = playerCount - 2; dist.seer = 1;
+    dist.werewolf = 1; dist.villager = playerCount - 3; dist.seer = 1; dist.doctor = 1;
   } else if (playerCount <= 8) {
     dist.werewolf = 2; dist.villager = playerCount - 4; dist.seer = 1; dist.doctor = 1;
   } else {
@@ -108,12 +108,12 @@ io.on('connection', (socket) => {
     if (room.players.length < 4) return cb({ success: false, error: 'ต้องมีผู้เล่นอย่างน้อย 4 คน' });
 
     room.players = assignRoles(room.players);
-    room.phase = 'night';
+    room.phase = 'day';
     room.round = 1;
     room.votes = {};
     room.actions = {};
     room.winner = null;
-    room.messages = [{ text: 'กลางคืนมาเยือน... ทุกคนหลับตา', type: 'system', time: Date.now() }];
+    room.messages = [{ text: 'วันแรกเริ่มต้น... ทุกคนลืมตา!', type: 'system', time: Date.now() }];
 
     cb({ success: true });
     io.to(code).emit('game-started', room);
@@ -293,7 +293,7 @@ function resolveDay(room) {
     if (target) {
       target.alive = false;
       room.messages.push({
-        text: `${target.name} ถูกโหวตออก บทบาท: ${ROLE_TH[target.role] || target.role}`,
+        text: `${target.name} ถูกโหวตออก`,
         type: 'system',
         time: Date.now(),
       });

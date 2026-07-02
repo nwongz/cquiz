@@ -390,7 +390,7 @@ export default function Werewolf() {
                   (me.role === 'doctor' && p.alive)
                 )) || (isDay && p.alive && p.id !== me?.id && me?.alive);
                 const isSelected = selectedTarget === p.id;
-                const showRole = isEnded || !p.alive || (isMe && myRole);
+                const showRole = isEnded || (isMe && myRole);
 
                 return (
                   <button
@@ -457,7 +457,7 @@ export default function Werewolf() {
               <div className="flex flex-wrap gap-2">
                 {deadPlayers().map((p) => (
                   <span key={p.id} className="text-xs text-stone-500 bg-white px-2 py-1 rounded-lg">
-                    {p.name} ({ROLE_INFO[p.role]?.name || p.role})
+                    {p.name} {isEnded ? `(${ROLE_INFO[p.role]?.name || p.role})` : ''}
                   </span>
                 ))}
               </div>
