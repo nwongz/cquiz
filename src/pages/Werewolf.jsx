@@ -144,9 +144,9 @@ export default function Werewolf() {
     if (!me || !me.alive) return;
 
     let action = 'vote';
-    if (me.role === 'werewolf') action = 'kill';
+    if (me.role === 'werewolf' || me.role === 'cub') action = 'kill';
     else if (me.role === 'seer') action = 'investigate';
-    else if (me.role === 'doctor') action = 'heal';
+    else if (me.role === 'guardian') action = 'protect';
 
     socket.emit('night-action', { code: room.code, action, targetId });
     setSelectedTarget(targetId);
