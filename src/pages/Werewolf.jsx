@@ -31,11 +31,7 @@ export default function Werewolf() {
   const [error, setError] = useState('');
   const [seerResult, setSeerResult] = useState(null);
   const [selectedTarget, setSelectedTarget] = useState(null);
-  // Disable TTS by default on touch devices (mobile) to avoid freeze
-  const [soundOn, setSoundOn] = useState(() => {
-    if (typeof window === 'undefined') return true;
-    return !('ontouchstart' in window);
-  });
+  const [soundOn, setSoundOn] = useState(false);
   const [voteCount, setVoteCount] = useState({ voted: 0, total: 0 });
   const [actionSubmitted, setActionSubmitted] = useState(false);
   const messagesEndRef = useRef(null);
