@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, Users, LogIn, Play, Moon, Sun, Skull,
   MessageCircle, Send, Shield, Eye, Heart, Ghost,
-  Vote, Crown, Clock, Volume2, VolumeX
+  Vote, Crown, Clock, Volume2, VolumeX, Copy, Share2, Check
 } from 'lucide-react';
 
 const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:3001';
@@ -34,6 +34,7 @@ export default function Werewolf() {
   const [soundOn, setSoundOn] = useState(false);
   const [voteCount, setVoteCount] = useState({ voted: 0, total: 0 });
   const [actionSubmitted, setActionSubmitted] = useState(false);
+  const [copied, setCopied] = useState(false);
   const messagesEndRef = useRef(null);
 
   useEffect(() => {
@@ -129,6 +130,39 @@ export default function Werewolf() {
         setError(res.error || 'ไม่สามารถเข้าห้องได้');
       }
     });
+  };
+
+  const copyRoomCode = async () => {
+    if (!room) return;
+    try {
+      await navigator.clipboard.writeText(room.code);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Fallback for older browsers
+      const ta = document.createElement('textarea');
+      ta.value = room.code;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  const shareRoom = async () => {
+    if (!room) return;
+    const text = `เข้าร่วมเกม Werewolf รหัสห้อง: ${room.code}`;
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: 'Werewolf Game', text });
+      } catch (err) {
+        if (err.name !== 'AbortError') copyRoomCode();
+      }
+    } else {
+      copyRoomCode();
+    }
   };
 
   const handleStart = () => {
@@ -271,7 +305,23 @@ export default function Werewolf() {
         <div className="max-w-md mx-auto px-6">
           <div className="text-center mb-8">
             <h1 className="text-2xl font-bold text-secondary-800 mb-2">ห้อง #{room.code}</h1>
-            <p className="text-secondary-500 text-sm">รอผู้เล่นเข้าร่วม...</p>
+            <p className="text-secondary-500 text-sm mb-4">รอผู้เล่นเข้าร่วม...</p>
+            <div className="flex items-center justify-center gap-2">
+              <button
+                onClick={copyRoomCode}
+                className="inline-flex items-center gap-1.5 px-4 py-2 bg-white border border-secondary-200 rounded-xl text-sm font-medium text-secondary-700 hover:bg-secondary-50 transition-colors"
+              >
+                {copied ? <Check size={16} className="text-emerald-500" /> : <Copy size={16} />}
+                {copied ? 'คัดลอกแล้ว' : 'คัดลอกรหัส'}
+              </button>
+              <button
+                onClick={shareRoom}
+                className="inline-flex items-center gap-1.5 px-4 py-2 bg-primary-600 rounded-xl text-sm font-medium text-white hover:bg-primary-700 transition-colors"
+              >
+                <Share2 size={16} />
+                แชร์
+              </button>
+            </div>
           </div>
 
           <div className="bg-white rounded-3xl shadow-sm border border-secondary-100 p-6 mb-6">
