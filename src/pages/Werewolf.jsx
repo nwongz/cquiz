@@ -31,7 +31,11 @@ export default function Werewolf() {
   const [error, setError] = useState('');
   const [seerResult, setSeerResult] = useState(null);
   const [selectedTarget, setSelectedTarget] = useState(null);
-  const [soundOn, setSoundOn] = useState(true);
+  // Disable TTS by default on touch devices (mobile) to avoid freeze
+  const [soundOn, setSoundOn] = useState(() => {
+    if (typeof window === 'undefined') return true;
+    return !('ontouchstart' in window);
+  });
   const [voteCount, setVoteCount] = useState({ voted: 0, total: 0 });
   const [actionSubmitted, setActionSubmitted] = useState(false);
   const messagesEndRef = useRef(null);
@@ -177,29 +181,13 @@ export default function Werewolf() {
   function speak(text) {
     if (!soundOn) return;
     if (!window.speechSynthesis) return;
-    // Chrome bug fix: resume stuck synthesis engine
-    if (window.speechSynthesis.paused || window.speechSynthesis.pending) {
-      window.speechSynthesis.resume();
-    }
     window.speechSynthesis.cancel();
     const utter = new SpeechSynthesisUtterance(text);
     utter.lang = 'th-TH';
     utter.rate = 1;
     utter.pitch = 1;
-    utter.onstart = () => {
-      if (window.speechSynthesis.paused) window.speechSynthesis.resume();
-    };
     window.speechSynthesis.speak(utter);
   }
-
-  // Keep-alive for Chrome speech synthesis bug
-  useEffect(() => {
-    if (!window.speechSynthesis) return;
-    const id = setInterval(() => {
-      if (window.speechSynthesis.paused) window.speechSynthesis.resume();
-    }, 5000);
-    return () => clearInterval(id);
-  }, []);
 
   // Home view
   if (view === 'home') {
