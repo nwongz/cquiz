@@ -177,13 +177,29 @@ export default function Werewolf() {
   function speak(text) {
     if (!soundOn) return;
     if (!window.speechSynthesis) return;
+    // Chrome bug fix: resume stuck synthesis engine
+    if (window.speechSynthesis.paused || window.speechSynthesis.pending) {
+      window.speechSynthesis.resume();
+    }
     window.speechSynthesis.cancel();
     const utter = new SpeechSynthesisUtterance(text);
     utter.lang = 'th-TH';
     utter.rate = 1;
     utter.pitch = 1;
+    utter.onstart = () => {
+      if (window.speechSynthesis.paused) window.speechSynthesis.resume();
+    };
     window.speechSynthesis.speak(utter);
   }
+
+  // Keep-alive for Chrome speech synthesis bug
+  useEffect(() => {
+    if (!window.speechSynthesis) return;
+    const id = setInterval(() => {
+      if (window.speechSynthesis.paused) window.speechSynthesis.resume();
+    }, 5000);
+    return () => clearInterval(id);
+  }, []);
 
   // Home view
   if (view === 'home') {
