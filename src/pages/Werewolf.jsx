@@ -13,7 +13,9 @@ const ROLE_INFO = {
   villager: { name: 'ชาวบ้าน', icon: Users, color: 'text-emerald-600', bg: 'bg-emerald-50', desc: 'ค้นหาและกำจัดหมาป่าให้ได้' },
   werewolf: { name: 'หมาป่า', icon: Ghost, color: 'text-rose-600', bg: 'bg-rose-50', desc: 'กลืนกินชาวบ้านโดยไม่ให้ถูกจับได้' },
   seer: { name: 'หมอดู', icon: Eye, color: 'text-violet-600', bg: 'bg-violet-50', desc: 'ตรวจสอบว่าใครเป็นหมาป่าในเวลากลางคืน' },
-  doctor: { name: 'หมอ', icon: Heart, color: 'text-sky-600', bg: 'bg-sky-50', desc: 'ปกป้องใครสักคนจากการถูกโจมตี' },
+  guardian: { name: 'ผู้ปกป้อง', icon: Heart, color: 'text-sky-600', bg: 'bg-sky-50', desc: 'ปกป้องใครสักคนจากการถูกโจมตี' },
+  jester: { name: 'ยาจก', icon: Skull, color: 'text-amber-600', bg: 'bg-amber-50', desc: 'ถูกโหวตออกในกลางวันเพื่อชนะ' },
+  cub: { name: 'ลูกหมาป่า', icon: Ghost, color: 'text-rose-500', bg: 'bg-rose-50', desc: 'ถ้าตาย หมาป่าจะฆ่าได้ 2 คนในรอบหน้า' },
 };
 
 export default function Werewolf() {
@@ -387,12 +389,16 @@ export default function Werewolf() {
           {/* Winner */}
           {isEnded && room.winner && (
             <div className={`rounded-2xl p-6 mb-4 text-center ${
-              room.winner === 'village' ? 'bg-emerald-50 border border-emerald-200' : 'bg-rose-50 border border-rose-200'
+              room.winner === 'village' ? 'bg-emerald-50 border border-emerald-200' :
+              room.winner === 'jester' ? 'bg-amber-50 border border-amber-200' :
+              'bg-rose-50 border border-rose-200'
             }`}>
               <div className={`text-2xl font-bold mb-2 ${
-                room.winner === 'village' ? 'text-emerald-700' : 'text-rose-700'
+                room.winner === 'village' ? 'text-emerald-700' :
+                room.winner === 'jester' ? 'text-amber-700' :
+                'text-rose-700'
               }`}>
-                {room.winner === 'village' ? 'ชาวบ้านชนะ!' : 'หมาป่าชนะ!'}
+                {room.winner === 'village' ? 'ชาวบ้านชนะ!' : room.winner === 'jester' ? 'ยาจกชนะ!' : 'หมาป่าชนะ!'}
               </div>
               <p className="text-sm text-secondary-500">ขอบคุณที่เล่นเกมนี้</p>
             </div>
@@ -408,9 +414,9 @@ export default function Werewolf() {
               {room.players.map((p) => {
                 const isMe = p.id === socket?.id;
                 const canTarget = (isNight && me?.alive && (
-                  (me.role === 'werewolf' && p.alive && p.id !== me.id) ||
+                  ((me.role === 'werewolf' || me.role === 'cub') && p.alive && p.id !== me.id) ||
                   (me.role === 'seer' && p.alive && p.id !== me.id) ||
-                  (me.role === 'doctor' && p.alive)
+                  (me.role === 'guardian' && p.alive)
                 )) || (isDay && p.alive && p.id !== me?.id && me?.alive);
                 const isSelected = selectedTarget === p.id;
                 const showRole = isEnded || (isMe && myRole);

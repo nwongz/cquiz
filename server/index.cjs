@@ -23,7 +23,9 @@ const ROLE_TH = {
   villager: 'ชาวบ้าน',
   werewolf: 'หมาป่า',
   seer: 'หมอดู',
-  doctor: 'หมอ',
+  guardian: 'ผู้ปกป้อง',
+  jester: 'ยาจก',
+  cub: 'ลูกหมาป่า',
 };
 
 function shuffle(arr) {
@@ -36,13 +38,13 @@ function shuffle(arr) {
 }
 
 function getRoleDistribution(playerCount) {
-  const dist = { werewolf: 0, villager: 0, seer: 0, doctor: 0 };
+  const dist = { werewolf: 0, villager: 0, seer: 0, guardian: 0, jester: 0, cub: 0 };
   if (playerCount <= 5) {
-    dist.werewolf = 1; dist.villager = playerCount - 3; dist.seer = 1; dist.doctor = 1;
-  } else if (playerCount <= 8) {
-    dist.werewolf = 2; dist.villager = playerCount - 4; dist.seer = 1; dist.doctor = 1;
+    dist.werewolf = 1; dist.villager = playerCount - 3; dist.seer = 1; dist.guardian = 1;
+  } else if (playerCount <= 7) {
+    dist.werewolf = 1; dist.villager = playerCount - 4; dist.seer = 1; dist.guardian = 1; dist.jester = 1;
   } else {
-    dist.werewolf = 2; dist.villager = playerCount - 4; dist.seer = 1; dist.doctor = 1;
+    dist.werewolf = 2; dist.villager = playerCount - 6; dist.seer = 1; dist.guardian = 1; dist.jester = 1; dist.cub = 1;
   }
   return dist;
 }
@@ -53,15 +55,18 @@ function assignRoles(players) {
   for (let i = 0; i < dist.werewolf; i++) roles.push('werewolf');
   for (let i = 0; i < dist.villager; i++) roles.push('villager');
   if (dist.seer) roles.push('seer');
-  if (dist.doctor) roles.push('doctor');
+  if (dist.guardian) roles.push('guardian');
+  if (dist.jester) roles.push('jester');
+  if (dist.cub) roles.push('cub');
   const shuffled = shuffle(roles);
   return players.map((p, i) => ({ ...p, role: shuffled[i], alive: true }));
 }
 
 function checkWin(room) {
+  if (room.winner === 'jester') return 'jester';
   const alive = room.players.filter((p) => p.alive);
-  const wolves = alive.filter((p) => p.role === 'werewolf');
-  const villagers = alive.filter((p) => p.role !== 'werewolf');
+  const wolves = alive.filter((p) => p.role === 'werewolf' || p.role === 'cub');
+  const villagers = alive.filter((p) => p.role !== 'werewolf' && p.role !== 'cub');
   if (wolves.length === 0) return 'village';
   if (wolves.length >= villagers.length) return 'werewolf';
   return null;
@@ -82,6 +87,7 @@ io.on('connection', (socket) => {
       actions: {},
       messages: [],
       winner: null,
+      cubRevenge: false,
     });
     socket.join(code);
     cb({ success: true, code });
@@ -113,6 +119,7 @@ io.on('connection', (socket) => {
     room.votes = {};
     room.actions = {};
     room.winner = null;
+    room.cubRevenge = false;
     room.messages = [{ text: 'วันแรกเริ่มต้น... ทุกคนลืมตา!', type: 'system', time: Date.now() }];
 
     cb({ success: true });
@@ -132,15 +139,15 @@ io.on('connection', (socket) => {
 
     room.actions[socket.id] = { action, targetId };
 
-    const aliveWerewolves = room.players.filter((p) => p.alive && p.role === 'werewolf');
-    const aliveSpecial = room.players.filter((p) => p.alive && ['seer', 'doctor'].includes(p.role));
-    const werewolfActions = aliveWerewolves.filter((w) => room.actions[w.id]);
+    const aliveWolves = room.players.filter((p) => p.alive && (p.role === 'werewolf' || p.role === 'cub'));
+    const aliveSpecial = room.players.filter((p) => p.alive && ['seer', 'guardian'].includes(p.role));
+    const wolfActions = aliveWolves.filter((w) => room.actions[w.id]);
     const specialActions = aliveSpecial.filter((s) => room.actions[s.id]);
 
-    const allWerewolvesDone = aliveWerewolves.length > 0 && werewolfActions.length === aliveWerewolves.length;
+    const allWolvesDone = aliveWolves.length > 0 && wolfActions.length === aliveWolves.length;
     const allSpecialDone = aliveSpecial.length === specialActions.length;
 
-    if (allWerewolvesDone && allSpecialDone) {
+    if (allWolvesDone && allSpecialDone) {
       resolveNight(room);
       io.to(code).emit('phase-change', room);
     }
@@ -170,7 +177,7 @@ io.on('connection', (socket) => {
     if (!room) return;
     const player = room.players.find((p) => p.id === socket.id);
     if (!player || !player.alive) return;
-    if (room.phase === 'night' && player.role !== 'werewolf') return;
+    if (room.phase === 'night' && player.role !== 'werewolf' && player.role !== 'cub') return;
 
     const msg = { name: player.name, text, time: Date.now(), id: socket.id };
     room.messages.push(msg);
@@ -191,12 +198,21 @@ io.on('connection', (socket) => {
           }
         } else {
           room.players[idx].alive = false;
+          if (room.players[idx].role === 'cub') {
+            room.cubRevenge = true;
+            room.messages.push({
+              text: 'ลูกหมาป่าตาย! หมาป่าโกรธจัด พร้อมฆ่า 2 คนในกลางคืนหน้า',
+              type: 'system',
+              time: Date.now(),
+            });
+          }
           const winner = checkWin(room);
           if (winner) {
             room.phase = 'ended';
             room.winner = winner;
+            const winText = winner === 'village' ? 'ชาวบ้านชนะ!' : winner === 'jester' ? 'ยาจกชนะ!' : 'หมาป่าชนะ!';
             room.messages.push({
-              text: winner === 'village' ? 'ชาวบ้านชนะ!' : 'หมาป่าชนะ!',
+              text: winText,
               type: 'system',
               time: Date.now(),
             });
@@ -210,11 +226,11 @@ io.on('connection', (socket) => {
 });
 
 function resolveNight(room) {
-  const wolves = room.players.filter((p) => p.alive && p.role === 'werewolf');
+  const wolves = room.players.filter((p) => p.alive && (p.role === 'werewolf' || p.role === 'cub'));
   const seer = room.players.find((p) => p.alive && p.role === 'seer');
-  const doctor = room.players.find((p) => p.alive && p.role === 'doctor');
+  const guardian = room.players.find((p) => p.alive && p.role === 'guardian');
 
-  let killTarget = null;
+  // Collect wolf votes
   const wolfVotes = {};
   wolves.forEach((w) => {
     const act = room.actions[w.id];
@@ -222,42 +238,100 @@ function resolveNight(room) {
       wolfVotes[act.targetId] = (wolfVotes[act.targetId] || 0) + 1;
     }
   });
-  const maxVotes = Math.max(...Object.values(wolfVotes), 0);
-  const targets = Object.entries(wolfVotes).filter(([, v]) => v === maxVotes);
-  if (targets.length > 0) {
-    killTarget = room.players.find((p) => p.id === targets[0][0]);
-  }
 
-  let saved = false;
-  if (doctor) {
-    const docAct = room.actions[doctor.id];
-    if (docAct && docAct.targetId && killTarget && killTarget.id === docAct.targetId) {
-      saved = true;
+  // Sort targets by votes
+  const sortedTargets = Object.entries(wolfVotes)
+    .sort(([, a], [, b]) => b - a)
+    .map(([id]) => room.players.find((p) => p.id === id))
+    .filter(Boolean);
+
+  const killTarget1 = sortedTargets[0] || null;
+  let killTarget2 = room.cubRevenge ? (sortedTargets[1] || null) : null;
+
+  // If cubRevenge and no second target, pick random alive non-wolf
+  if (room.cubRevenge && !killTarget2) {
+    const candidates = room.players.filter(
+      (p) => p.alive && p.role !== 'werewolf' && p.role !== 'cub' && p.id !== killTarget1?.id
+    );
+    if (candidates.length > 0) {
+      killTarget2 = candidates[Math.floor(Math.random() * candidates.length)];
     }
   }
 
+  // Guardian save
+  let savedTarget = null;
+  if (guardian) {
+    const guardAct = room.actions[guardian.id];
+    if (guardAct && guardAct.targetId) {
+      savedTarget = room.players.find((p) => p.id === guardAct.targetId);
+    }
+  }
+
+  // Seer investigate
   let seerResult = null;
   if (seer) {
     const seerAct = room.actions[seer.id];
     if (seerAct && seerAct.targetId) {
       const target = room.players.find((p) => p.id === seerAct.targetId);
-      if (target) seerResult = { targetId: target.id, isWerewolf: target.role === 'werewolf' };
+      if (target) seerResult = { targetId: target.id, isWerewolf: target.role === 'werewolf' || target.role === 'cub' };
     }
   }
 
-  if (killTarget && !saved && killTarget.role !== 'werewolf') {
-    killTarget.alive = false;
+  // Apply kills
+  const killed = [];
+
+  if (killTarget1 && killTarget1.alive) {
+    const isSaved = savedTarget && savedTarget.id === killTarget1.id;
+    if (!isSaved && killTarget1.role !== 'werewolf' && killTarget1.role !== 'cub') {
+      killTarget1.alive = false;
+      killed.push(killTarget1);
+    }
+  }
+
+  if (killTarget2 && killTarget2.alive && killTarget2.id !== killTarget1?.id) {
+    const isSaved = savedTarget && savedTarget.id === killTarget2.id;
+    if (!isSaved && killTarget2.role !== 'werewolf' && killTarget2.role !== 'cub') {
+      killTarget2.alive = false;
+      killed.push(killTarget2);
+    }
+  }
+
+  // Death messages
+  if (killed.length === 1) {
     room.messages.push({
-      text: `${killTarget.name} ถูกพบว่าตายในเช้าวันนี้`,
+      text: `${killed[0].name} ถูกพบว่าตายในเช้าวันนี้`,
       type: 'system',
       time: Date.now(),
     });
-  } else if (killTarget && saved) {
+  } else if (killed.length === 2) {
+    room.messages.push({
+      text: `${killed[0].name} และ ${killed[1].name} ถูกพบว่าตายในเช้าวันนี้`,
+      type: 'system',
+      time: Date.now(),
+    });
+  } else if ((killTarget1 || killTarget2) && savedTarget) {
     room.messages.push({
       text: 'มีคนถูกโจมตีแต่รอดชีวิต!',
       type: 'system',
       time: Date.now(),
     });
+  }
+
+  // Check if cub died → trigger revenge for next night
+  killed.forEach((p) => {
+    if (p.role === 'cub') {
+      room.cubRevenge = true;
+      room.messages.push({
+        text: 'ลูกหมาป่าตาย! หมาป่าโกรธจัด พร้อมฆ่า 2 คนในกลางคืนหน้า',
+        type: 'system',
+        time: Date.now(),
+      });
+    }
+  });
+
+  // Clear cubRevenge after use
+  if (room.cubRevenge && killed.length > 0) {
+    room.cubRevenge = false;
   }
 
   room.actions = {};
@@ -267,8 +341,9 @@ function resolveNight(room) {
   if (winner) {
     room.phase = 'ended';
     room.winner = winner;
+    const winText = winner === 'village' ? 'ชาวบ้านชนะ!' : winner === 'jester' ? 'ยาจกชนะ!' : 'หมาป่าชนะ!';
     room.messages.push({
-      text: winner === 'village' ? 'ชาวบ้านชนะ!' : 'หมาป่าชนะ!',
+      text: winText,
       type: 'system',
       time: Date.now(),
     });
@@ -291,12 +366,33 @@ function resolveDay(room) {
   if (top.length === 1) {
     const target = room.players.find((p) => p.id === top[0][0]);
     if (target) {
+      // Jester wins if voted out during day
+      if (target.role === 'jester') {
+        room.phase = 'ended';
+        room.winner = 'jester';
+        room.messages.push({
+          text: `${target.name} ถูกโหวตออก ยาจกชนะ!`,
+          type: 'system',
+          time: Date.now(),
+        });
+        room.votes = {};
+        return;
+      }
       target.alive = false;
       room.messages.push({
         text: `${target.name} ถูกโหวตออก`,
         type: 'system',
         time: Date.now(),
       });
+      // If cub dies by day vote, trigger revenge
+      if (target.role === 'cub') {
+        room.cubRevenge = true;
+        room.messages.push({
+          text: 'ลูกหมาป่าตาย! หมาป่าโกรธจัด พร้อมฆ่า 2 คนในกลางคืนหน้า',
+          type: 'system',
+          time: Date.now(),
+        });
+      }
     }
   } else {
     room.messages.push({
@@ -314,8 +410,9 @@ function resolveDay(room) {
   if (winner) {
     room.phase = 'ended';
     room.winner = winner;
+    const winText = winner === 'village' ? 'ชาวบ้านชนะ!' : winner === 'jester' ? 'ยาจกชนะ!' : 'หมาป่าชนะ!';
     room.messages.push({
-      text: winner === 'village' ? 'ชาวบ้านชนะ!' : 'หมาป่าชนะ!',
+      text: winText,
       type: 'system',
       time: Date.now(),
     });
