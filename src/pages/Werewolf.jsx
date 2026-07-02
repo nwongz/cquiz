@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, Users, LogIn, Play, Moon, Sun, Skull,
   MessageCircle, Send, Shield, Eye, Heart, Ghost,
-  Vote, Crown, Clock
+  Vote, Crown, Clock, Volume2, VolumeX
 } from 'lucide-react';
 
 const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:3001';
@@ -29,6 +29,7 @@ export default function Werewolf() {
   const [error, setError] = useState('');
   const [seerResult, setSeerResult] = useState(null);
   const [selectedTarget, setSelectedTarget] = useState(null);
+  const [soundOn, setSoundOn] = useState(true);
   const [voteCount, setVoteCount] = useState({ voted: 0, total: 0 });
   const [actionSubmitted, setActionSubmitted] = useState(false);
   const messagesEndRef = useRef(null);
@@ -48,6 +49,8 @@ export default function Werewolf() {
       setMessages(r.messages || []);
       setActionSubmitted(false);
       setSeerResult(null);
+      const lastMsg = r.messages?.[r.messages.length - 1];
+      if (lastMsg?.type === 'system') speak(lastMsg.text);
     });
     socket.on('your-role', ({ role }) => setMyRole(role));
     socket.on('phase-change', (r) => {
@@ -56,12 +59,15 @@ export default function Werewolf() {
       setActionSubmitted(false);
       setSelectedTarget(null);
       setVoteCount({ voted: 0, total: r.players.filter((p) => p.alive).length });
+      const lastMsg = r.messages?.[r.messages.length - 1];
+      if (lastMsg?.type === 'system') speak(lastMsg.text);
     });
     socket.on('vote-update', ({ votes, total, voted }) => {
       setVoteCount({ voted, total });
     });
     socket.on('new-message', (msg) => {
       setMessages((prev) => [...prev, msg]);
+      if (msg.type === 'system') speak(msg.text);
     });
     socket.on('seer-result', (res) => setSeerResult(res));
     socket.on('player-disconnected', ({ room: r }) => {
@@ -165,6 +171,17 @@ export default function Werewolf() {
   const deadPlayers = () => room?.players.filter((p) => !p.alive) || [];
 
   const roleInfo = myRole ? ROLE_INFO[myRole] : null;
+
+  function speak(text) {
+    if (!soundOn) return;
+    if (!window.speechSynthesis) return;
+    window.speechSynthesis.cancel();
+    const utter = new SpeechSynthesisUtterance(text);
+    utter.lang = 'th-TH';
+    utter.rate = 1;
+    utter.pitch = 1;
+    window.speechSynthesis.speak(utter);
+  }
 
   // Home view
   if (view === 'home') {
@@ -332,7 +349,13 @@ export default function Werewolf() {
                 {isEnded && 'เกมจบแล้ว!'}
               </span>
             </div>
-            <div className="text-xs text-secondary-400">#{room.code}</div>
+            <button
+              onClick={() => setSoundOn((v) => !v)}
+              className={`p-2 rounded-xl transition-colors ${soundOn ? 'bg-primary-50 text-primary-600' : 'bg-secondary-100 text-secondary-400'}`}
+              title={soundOn ? 'ปิดเสียง' : 'เปิดเสียง'}
+            >
+              {soundOn ? <Volume2 size={16} /> : <VolumeX size={16} />}
+            </button>
           </div>
 
           {/* Role reveal */}
