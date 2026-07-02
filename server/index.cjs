@@ -19,6 +19,13 @@ function generateRoomCode() {
   return Math.random().toString(36).substring(2, 8).toUpperCase();
 }
 
+const ROLE_TH = {
+  villager: 'ชาวบ้าน',
+  werewolf: 'หมาป่า',
+  seer: 'หมอดู',
+  doctor: 'หมอ',
+};
+
 function shuffle(arr) {
   const a = [...arr];
   for (let i = a.length - 1; i > 0; i--) {
@@ -98,7 +105,7 @@ io.on('connection', (socket) => {
     const room = rooms.get(code);
     if (!room) return cb({ success: false });
     if (room.hostId !== socket.id) return cb({ success: false });
-    if (room.players.length < 4) return cb({ success: false, error: 'Need at least 4 players' });
+    if (room.players.length < 4) return cb({ success: false, error: 'ต้องมีผู้เล่นอย่างน้อย 4 คน' });
 
     room.players = assignRoles(room.players);
     room.phase = 'night';
@@ -106,7 +113,7 @@ io.on('connection', (socket) => {
     room.votes = {};
     room.actions = {};
     room.winner = null;
-    room.messages = [{ text: 'Night falls... everyone close your eyes.', type: 'system', time: Date.now() }];
+    room.messages = [{ text: 'กลางคืนมาเยือน... ทุกคนหลับตา', type: 'system', time: Date.now() }];
 
     cb({ success: true });
     io.to(code).emit('game-started', room);
@@ -189,7 +196,7 @@ io.on('connection', (socket) => {
             room.phase = 'ended';
             room.winner = winner;
             room.messages.push({
-              text: winner === 'village' ? 'Villagers win!' : 'Werewolves win!',
+              text: winner === 'village' ? 'ชาวบ้านชนะ!' : 'หมาป่าชนะ!',
               type: 'system',
               time: Date.now(),
             });
@@ -241,13 +248,13 @@ function resolveNight(room) {
   if (killTarget && !saved && killTarget.role !== 'werewolf') {
     killTarget.alive = false;
     room.messages.push({
-      text: `${killTarget.name} was found dead in the morning.`,
+      text: `${killTarget.name} ถูกพบว่าตายในเช้าวันนี้`,
       type: 'system',
       time: Date.now(),
     });
   } else if (killTarget && saved) {
     room.messages.push({
-      text: 'Someone was attacked but survived!',
+      text: 'มีคนถูกโจมตีแต่รอดชีวิต!',
       type: 'system',
       time: Date.now(),
     });
@@ -261,7 +268,7 @@ function resolveNight(room) {
     room.phase = 'ended';
     room.winner = winner;
     room.messages.push({
-      text: winner === 'village' ? 'Villagers win!' : 'Werewolves win!',
+      text: winner === 'village' ? 'ชาวบ้านชนะ!' : 'หมาป่าชนะ!',
       type: 'system',
       time: Date.now(),
     });
@@ -286,14 +293,14 @@ function resolveDay(room) {
     if (target) {
       target.alive = false;
       room.messages.push({
-        text: `${target.name} was voted out. They were a ${target.role}.`,
+        text: `${target.name} ถูกโหวตออก บทบาท: ${ROLE_TH[target.role] || target.role}`,
         type: 'system',
         time: Date.now(),
       });
     }
   } else {
     room.messages.push({
-      text: 'The vote was tied. No one was eliminated.',
+      text: 'โหวตเสมอ! ไม่มีใครถูกจับ',
       type: 'system',
       time: Date.now(),
     });
@@ -308,13 +315,13 @@ function resolveDay(room) {
     room.phase = 'ended';
     room.winner = winner;
     room.messages.push({
-      text: winner === 'village' ? 'Villagers win!' : 'Werewolves win!',
+      text: winner === 'village' ? 'ชาวบ้านชนะ!' : 'หมาป่าชนะ!',
       type: 'system',
       time: Date.now(),
     });
   } else {
     room.messages.push({
-      text: `Night ${room.round} falls...`,
+      text: `กลางคืนรอบ ${room.round}...`,
       type: 'system',
       time: Date.now(),
     });
@@ -323,5 +330,5 @@ function resolveDay(room) {
 
 const PORT = process.env.PORT || 3001;
 httpServer.listen(PORT, () => {
-  console.log(`Werewolf server running on port ${PORT}`);
+  console.log(`Werewolf server รันที่พอร์ต ${PORT}`);
 });
